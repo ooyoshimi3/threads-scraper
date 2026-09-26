@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Threads スクレイパー</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+      color: #333;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #333;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    input[type="text"]::placeholder {
+      color: #999;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-download {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-download:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-download:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .status {
+      padding: 12px 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+
+    .status.loading {
+      display: block;
+      background: #e3f2fd;
+      color: #1976d2;
+      border: 1px solid #1976d2;
+    }
+
+    .status.success {
+      display: block;
+      background: #e8f5e9;
+      color: #388e3c;
+      border: 1px solid #388e3c;
+    }
+
+    .status.error {
+      display: block;
+      background: #ffebee;
+      color: #d32f2f;
+      border: 1px solid #d32f2f;
+    }
+
+    .info {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #666;
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+
+    .info strong {
+      color: #333;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(25, 118, 210, 0.3);
+      border-top-color: #1976d2;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Threads スクレイパー</h1>
+    <p class="subtitle">Threads の投稿をスクリーンショットしてダウンロード</p>
+
+    <div class="form-group">
+      <label for="threadUrl">Threads URL:</label>
+      <input
+        type="text"
+        id="threadUrl"
+        placeholder="https://www.threads.com/share/..."
+        value="https://www.threads.com/share/FLSPoAHBJ/"
+      >
+    </div>
+
+    <div class="button-group">
+      <button class="btn-download" id="downloadBtn" onclick="downloadImage()">
+        ダウンロード
+      </button>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <div class="info">
+      <strong>使い方：</strong><br>
+      1. Threads の投稿 URL を入力<br>
+      2. 「ダウンロード」をクリック<br>
+      3. スクリーンショットが自動でダウンロードされます
+    </div>
+  </div>
+
+  <script>
+    const threadUrl = document.getElementById('threadUrl');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const status = document.getElementById('status');
+
+    function showStatus(message, type) {
+      status.textContent = message;
+      status.className = `status ${type}`;
+
+      if (type === 'error' || type === 'success') {
+        setTimeout(() => {
+          status.style.display = 'none';
+        }, 5000);
+      }
+    }
+
+    async function downloadImage() {
+      const url = threadUrl.value.trim();
+
+      if (!url) {
+        showStatus('URL を入力してください', 'error');
+        return;
+      }
+
+      if (!url.includes('threads.com')) {
+        showStatus('有効な Threads URL を入力してください', 'error');
+        return;
+      }
+
+      downloadBtn.disabled = true;
+      showStatus('<span class="spinner"></span>スクリーンショット取得中...', 'loading');
+
+      try {
+        const response = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'ダウンロードに失敗しました');
+        }
+
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+
+        // ファイル名：タイムスタンプ付き
+        const timestamp = new Date().toISOString().slice(0, 10);
+        link.download = `threads-${timestamp}-${Date.now()}.jpg`;
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+
+        showStatus('✓ ダウンロード完了！', 'success');
+      } catch (error) {
+        console.error('Error:', error);
+        showStatus(`エラー: ${error.message}`, 'error');
+      } finally {
+        downloadBtn.disabled = false;
+      }
+    }
+
+    // Enter キーでダウンロード
+    threadUrl.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        downloadImage();
+      }
+    });
+  </script>
+</body>
+</html>
